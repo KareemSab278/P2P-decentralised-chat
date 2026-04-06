@@ -4,6 +4,11 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { sendMessage, subscribeMessages, conversationId } from "../helpers";
 import { TextField } from "../Components/TextField";
 import type { ChatState, Message } from "../types";
+import { Modal } from "../Components/Modal";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faGear } from "@fortawesome/free-solid-svg-icons";
+
+// will need to import smoe sort of decryptor/encryptor here in the future
 
 export { Chat };
 
@@ -18,8 +23,18 @@ const Chat = () => {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
+
+  const [encryptionKey, setEncryptionKey] = useState<string | null>(null);
+  const [decryptionKey, setDecryptionKey] = useState<string | null>(null);
+
+  const [confirmation, setConfirmation] = useState<"delete" | "block" | null>(
+    null,
+  );
+
   const seen = useRef(new Set<string>());
   const listRef = useRef<HTMLDivElement>(null);
+
+  const [activeModal, setActiveModal] = useState<string | null>(null);
 
   const cleanup = subscribeMessages(convId, (msg: any, key: string) => {
     if (!msg || !msg.message) return;
@@ -68,7 +83,21 @@ const Chat = () => {
         <button style={styles.backButton} onClick={() => navigate(-1)}>
           <span style={styles.backButtonText}>{"<"}</span>
         </button>
+
         <span style={styles.headerTitle}>{recipientUser}</span>
+        <button
+          style={styles.configKeysButton}
+          onClick={() => setActiveModal("ee2e")}
+        >
+          Configure Keys
+        </button>
+
+        <button
+          style={styles.chatSettingsButton}
+          onClick={() => setActiveModal("chatSettings")}
+        >
+          <FontAwesomeIcon icon={faGear} />
+        </button>
       </div>
 
       <div ref={listRef} style={styles.messageList}>
@@ -89,6 +118,106 @@ const Chat = () => {
             </div>
           );
         })}
+
+        <Modal
+          visible={activeModal === "ee2e"}
+          title="Find a user"
+          onClose={() => setActiveModal(null)}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <span style={{ color: "#fff" }}>
+              Encryption Key (For {recipientUser} to decrypt messages you send)
+            </span>
+            {/* this is going to set the encryption keys and decryption keys to the recepient/receiver */}
+            {/* it should affect every message before it and after it. so the user can only see those messages - otherwise it is unreadable */}
+            <TextField
+              placeholder="Encryption Key"
+              value={encryptionKey ?? ""}
+              onChangeText={setEncryptionKey}
+              style={{ marginBottom: 16 }}
+            />
+            <span style={{ color: "#fff" }}>
+              Decryption Key (for you to decrypt messages {recipientUser} sends)
+            </span>
+            <TextField
+              placeholder="Decryption Key"
+              value={decryptionKey ?? ""}
+              onChangeText={setDecryptionKey}
+            />
+          </div>
+        </Modal>
+
+        <Modal
+          visible={activeModal === "chatSettings"}
+          onClose={() => setActiveModal(null)}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              alignItems: "center",
+            }}
+          >
+            <button
+              style={styles.settingsOptionsButton}
+              onClick={() => {
+                setConfirmation("block");
+                setActiveModal("confirmation");
+              }}
+            >
+              Block {recipientUser}
+            </button>
+            <button
+              style={styles.settingsOptionsButton}
+              onClick={() => {
+                setConfirmation("delete");
+                setActiveModal("confirmation");
+              }}
+            >
+              Delete Chat with {recipientUser}
+            </button>
+          </div>
+        </Modal>
+
+        <Modal
+          visible={activeModal === "confirmation"}
+          onClose={() => setActiveModal(null)}
+        >
+          Confirmation To {" "}
+          {confirmation === "delete"
+            ? `Delete Chat with ${recipientUser}`
+            : `Block ${recipientUser}`}
+          ?
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              gap: 12,
+              marginTop: 16,
+            }}
+          >
+            <button
+              style={styles.settingsOptionsButton}
+              onClick={() => {
+                if (confirmation === "delete") {
+                  // delete conversation logic here
+                } else {
+                  // block user logic here
+                }
+                setActiveModal(null);
+              }}
+            >
+              Confirmed
+            </button>
+            <button
+              style={styles.settingsOptionsButton}
+              onClick={() => setActiveModal(null)}
+            >
+              No, Cancel
+            </button>
+          </div>
+        </Modal>
       </div>
 
       <div style={styles.inputRow}>
@@ -140,6 +269,42 @@ const styles: Record<string, CSSProperties> = {
     background: "none",
     border: "none",
     cursor: "pointer",
+  },
+  configKeysButton: {
+    backgroundColor: "#2563eb",
+    padding: "8px 14px",
+    borderRadius: 8,
+    border: "none",
+    color: "#fff",
+    fontWeight: 600,
+    fontSize: 14,
+    cursor: "pointer",
+    display: "flex-end",
+    marginLeft: "auto",
+  },
+  chatSettingsButton: {
+    backgroundColor: "#1a1a1a",
+    padding: "8px 14px",
+    borderRadius: 8,
+    border: "none",
+    color: "#fff",
+    fontWeight: 600,
+    fontSize: 14,
+    cursor: "pointer",
+    display: "flex-end",
+    marginLeft: 8,
+  },
+  settingsOptionsButton: {
+    backgroundColor: "#eb2525",
+    padding: "8px 14px",
+    borderRadius: 8,
+    border: "none",
+    color: "#fff",
+    fontWeight: 600,
+    maxWidth: 200,
+    fontSize: 14,
+    cursor: "pointer",
+    display: "column",
   },
   backButtonText: {
     color: "#2563eb",
