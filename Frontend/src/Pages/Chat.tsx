@@ -7,8 +7,7 @@ import type { ChatState, Message } from "../types";
 import { Modal } from "../Components/Modal";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGear } from "@fortawesome/free-solid-svg-icons";
-
-// will need to import smoe sort of decryptor/encryptor here in the future
+import { encryptMessage, tryDecryptMessage } from "../secureMessages";
 
 export { Chat };
 
@@ -69,11 +68,16 @@ const Chat = () => {
     const trimmed = text.trim();
     if (!trimmed) return;
     setText("");
+
+    const payloadMessage = encryptionKey
+      ? encryptMessage({ message: trimmed, key: encryptionKey })
+      : trimmed;
+
     sendMessage(convId, {
       user_id: myUser,
       user_tag: `@${myUser}`,
       recipient: recipientUser,
-      message: trimmed,
+      message: payloadMessage,
     });
   }
 
@@ -103,12 +107,14 @@ const Chat = () => {
       <div ref={listRef} style={styles.messageList}>
         {messages.map((item) => {
           const isMe = item.user_id === myUser;
+          const displayMessage = tryDecryptMessage(item.message, decryptionKey ?? undefined);
+
           return (
             <div key={item.id} style={getMessageBubbleStyle(isMe)}>
               {!isMe && (
                 <div style={styles.messageUserTag}>{item.user_tag}</div>
               )}
-              <div style={styles.messageText}>{item.message}</div>
+              <div style={styles.messageText}>{displayMessage}</div>
               <div style={styles.messageTime}>
                 {new Date(item.timestamp).toLocaleTimeString([], {
                   hour: "2-digit",
@@ -203,7 +209,7 @@ const Chat = () => {
                 if (confirmation === "delete") {
                   // delete conversation logic here
                 } else {
-                  // block user logic here
+                  // block user logic here (not today im tured)
                 }
                 setActiveModal(null);
               }}
