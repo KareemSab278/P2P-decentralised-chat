@@ -29,7 +29,9 @@ const subscribeMessages = (
     .map()
     .on(callback);
 
-  return () => listener.off?.();
+  return () => {
+    listener.off?.();
+  };
 }
 
 const getChatsForUser = (

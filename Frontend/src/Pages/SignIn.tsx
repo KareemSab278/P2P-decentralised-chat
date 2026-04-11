@@ -5,25 +5,32 @@ import { gun } from "../gun";
 import { TextField } from "../Components/TextField";
 import Button from "../Components/Button";
 
+import { getPrivateKey } from "../logic/privateKey";
+import { getPublicKey } from "../logic/publicKey";
+import * as keys from "../logic/keysDB";
+
 export { SignIn };
+
 
 const SignIn = () => {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSignUp = () => {
     const u = username.trim();
+
     if (!u || !password) {
       setError("Username and password are required.");
       return;
     }
     setLoading(true);
-    setError("");
+    setError(null);
 
+    // check if username already exist
     gun
       .get("users")
       .get(u)
@@ -34,28 +41,67 @@ const SignIn = () => {
           return;
         }
 
+        // if doesnt exist then make new user and password
         (gun as any).user().create(u, password, (ack: any) => {
           setLoading(false);
+          setError(null);
           if (ack.err) {
             setError(ack.err);
             return;
           }
 
-          gun.get("users").get(u).put({ createdAt: Date.now() });
+          setLoading(true);
 
-          navigate("/home", { replace: true, state: { username: u } });
+          // make pub annd priv keys for new user to store locally on device
+          keys.generateKeyPair()
+            .then((keyPair) => {
+              // properties for saving keys fn
+              const props = {
+                username: u,
+                privateKey: keyPair.privateKey,
+                publicKey: keyPair.publicKey,
+              };
+
+              // fn name explicit
+              keys.savePrivateAndPublicKeyPairToDevice(props)
+                .then(() =>
+                  // if success save then nav home as new user.
+                  navigate("/home", {
+                    replace: true,
+                    state: { username: u },
+                  }),
+                )
+                .catch((error) => {
+                  setError(error);
+                });
+
+              setLoading(false);
+            })
+            // if could not create pub and priv keys then show error. Failed.
+            .catch((error) => {
+              setError(error);
+              setLoading(false);
+            });
         });
       });
   };
 
-  const handleSignIn = () => {
+  const handleSignIn = async () => {
     const u = username.trim();
+    const keysExistStatus = await keys.doUserKeysExist(u);
+
     if (!u || !password) {
       setError("Username and password are required.");
       return;
     }
+
+    if (!keysExistStatus){
+      setError("Keys for this user does not exists in storage on this device.");
+      return;
+    }
+
     setLoading(true);
-    setError("");
+    setError(null);
     (gun as any).user().auth(u, password, (ack: any) => {
       setLoading(false);
       if (ack.err) {

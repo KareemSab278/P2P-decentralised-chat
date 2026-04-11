@@ -7,7 +7,10 @@ import type { ChatState, Message } from "../types";
 import { Modal } from "../Components/Modal";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGear } from "@fortawesome/free-solid-svg-icons";
-import { encryptMessage, tryDecryptMessage } from "../secureMessages";
+
+import { encryptWithPublicKey, decryptWithPrivateKey } from "../logic/encryption";
+import { getPrivateKey } from "../logic/privateKey";
+import { getPublicKey } from "../logic/publicKey";
 
 export { Chat };
 
@@ -18,13 +21,15 @@ const Chat = () => {
     myUser: "",
     recipientUser: "",
   };
-  const convId = conversationId(myUser, recipientUser);
 
+  const convId = conversationId(myUser, recipientUser);
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
-
-  const [encryptionKey, setEncryptionKey] = useState<string | null>(null);
-  const [decryptionKey, setDecryptionKey] = useState<string | null>(null);
+  const [recipientPublicKey, setRecipientPublicKey] = useState<CryptoKey | null>(null);
+  const [myUserPrivateKey, setMyUserPrivateKey] = useState<CryptoKey | null>(null);
+  const [encryptionKey, setEncryptionKey] = useState("");
+  const [decryptionKey, setDecryptionKey] = useState("");
+  const [decryptedMessages, setDecryptedMessages] = useState<Record<string, string>>({});
 
   const [confirmation, setConfirmation] = useState<"delete" | "block" | null>(
     null,
@@ -35,28 +40,70 @@ const Chat = () => {
 
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
-  const cleanup = subscribeMessages(convId, (msg: any, key: string) => {
-    if (!msg || !msg.message) return;
-    if (seen.current.has(key)) return;
-    seen.current.add(key);
 
-    const newMsg: Message = {
-      id: key,
-      user_id: msg.user_id,
-      user_tag: msg.user_tag,
-      recipient: msg.recipient,
-      message: msg.message,
-      timestamp: msg.timestamp,
-    };
 
-    setMessages((prev) =>
-      [...prev, newMsg].sort((a, b) => a.timestamp - b.timestamp),
-    );
-  });
+  const getAndSetRecipientPublicKey = async () => await getPublicKey(recipientUser).then((pubKey) => setRecipientPublicKey(pubKey)).catch(() => setRecipientPublicKey(null));
+  const getAndSetUserPrivateKey = async () => await getPrivateKey(myUser).then((privKey) => setMyUserPrivateKey(privKey)).catch(() => setMyUserPrivateKey(null));
 
   useEffect(() => {
-    cleanup();
-  }, []);
+    getAndSetRecipientPublicKey();
+  }, [recipientUser]);
+
+  useEffect(() => {
+    const cleanup = subscribeMessages(convId, (msg: any, key: string) => {
+      if (!msg || !msg.message) return;
+      if (seen.current.has(key)) return;
+      seen.current.add(key);
+
+      const newMsg: Message = {
+        id: key,
+        user_id: msg.user_id,
+        user_tag: msg.user_tag,
+        recipient: msg.recipient,
+        message: msg.message,
+        timestamp: msg.timestamp,
+      };
+
+      setMessages((prev) =>
+        [...prev, newMsg].sort((a, b) => a.timestamp - b.timestamp),
+      );
+    });
+
+    getAndSetUserPrivateKey();
+    return cleanup;
+  }, [convId, myUser]);
+
+  useEffect(() => {
+    if (!myUserPrivateKey) {
+      setDecryptedMessages({});
+      return;
+    }
+
+    // this is from the older methods and im not a huige fan of it...
+    const decryptMessages = async () => {
+      const entries = await Promise.all(
+        messages.map(async (item) => {
+          if (item.user_id === myUser) {
+            return [item.id, item.message] as const;
+          }
+
+          try {
+            const decrypted = await decryptWithPrivateKey(
+              myUserPrivateKey,
+              item.message,
+            );
+            return [item.id, decrypted] as const;
+          } catch {
+            return [item.id, item.message] as const;
+          }
+        }),
+      );
+
+      setDecryptedMessages(Object.fromEntries(entries));
+    };
+
+    decryptMessages();
+  }, [messages, myUserPrivateKey, myUser]);
 
   useEffect(() => {
     if (listRef.current) {
@@ -64,14 +111,16 @@ const Chat = () => {
     }
   }, [messages]);
 
-  function send() {
+  async function send() {
     const trimmed = text.trim();
     if (!trimmed) return;
     setText("");
 
-    const payloadMessage = encryptionKey
-      ? encryptMessage({ message: trimmed, key: encryptionKey })
-      : trimmed;
+    let payloadMessage = trimmed;
+
+    if (recipientPublicKey) {
+      payloadMessage = await encryptWithPublicKey(recipientPublicKey, trimmed);
+    }
 
     sendMessage(convId, {
       user_id: myUser,
@@ -107,7 +156,9 @@ const Chat = () => {
       <div ref={listRef} style={styles.messageList}>
         {messages.map((item) => {
           const isMe = item.user_id === myUser;
-          const displayMessage = tryDecryptMessage(item.message, decryptionKey ?? undefined);
+          const displayMessage = isMe
+            ? item.message
+            : decryptedMessages[item.id] ?? item.message;
 
           return (
             <div key={item.id} style={getMessageBubbleStyle(isMe)}>
@@ -138,7 +189,7 @@ const Chat = () => {
             {/* it should affect every message before it and after it. so the user can only see those messages - otherwise it is unreadable */}
             <TextField
               placeholder="Encryption Key"
-              value={encryptionKey ?? ""}
+              value={encryptionKey}
               onChangeText={setEncryptionKey}
               style={{ marginBottom: 16 }}
             />
@@ -147,7 +198,7 @@ const Chat = () => {
             </span>
             <TextField
               placeholder="Decryption Key"
-              value={decryptionKey ?? ""}
+              value={decryptionKey}
               onChangeText={setDecryptionKey}
             />
           </div>

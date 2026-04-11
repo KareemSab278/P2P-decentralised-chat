@@ -20,18 +20,6 @@ export const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
   return bytes.buffer;
 };
 
-export const generateKeyPair = async (): Promise<CryptoKeyPair> =>
-  crypto.subtle.generateKey(
-    {
-      name: "RSA-OAEP",
-      modulusLength: 4096,
-      publicExponent: new Uint8Array([1, 0, 1]),
-      hash: "SHA-256",
-    },
-    true,
-    ["encrypt", "decrypt"],
-  );
-
 export const exportPublicKey = async (publicKey: CryptoKey): Promise<string> => {
   const jwk = await crypto.subtle.exportKey("jwk", publicKey);
   return JSON.stringify(jwk);
@@ -51,10 +39,21 @@ export const importPublicKey = async (publicKeyString: string): Promise<CryptoKe
   );
 };
 
+
+// use for sender and receiver.
 export const encryptWithPublicKey = async (
-  publicKey: CryptoKey,
-  message: string,
+  publicKey: CryptoKey | null,
+  message: string | null,
 ): Promise<string> => {
+
+   if (!publicKey){
+    throw new Error("No public key provided to encrypt with")
+  }
+
+  if (!message){
+    throw new Error("Message was missing to encrypt");
+  }
+
   const ciphertext = await crypto.subtle.encrypt(
     { name: "RSA-OAEP" },
     publicKey,
@@ -64,11 +63,21 @@ export const encryptWithPublicKey = async (
   return arrayBufferToBase64(ciphertext);
 };
 
+// use for sender and receiver.
 export const decryptWithPrivateKey = async (
-  privateKey: CryptoKey,
-  ciphertextBase64: string,
+  privateKey: CryptoKey | null,
+  ciphertextBase64: string | null,
 ): Promise<string> => {
-  const ciphertext = base64ToArrayBuffer(ciphertextBase64);
+  const ciphertext = ciphertextBase64 ? base64ToArrayBuffer(ciphertextBase64) : null;
+
+  if (!privateKey){
+    throw new Error("No private key provided to decrypt with")
+  }
+
+  if (!ciphertext){
+    throw new Error("Base 64 text was missing or failed to convert to arr buffer");
+  }
+
   const decrypted = await crypto.subtle.decrypt(
     { name: "RSA-OAEP" },
     privateKey,
