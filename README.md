@@ -1,20 +1,72 @@
-WIP: 
----
-okay so i was doing some research and found out this thing that crypto systems do: keypairs
+1. App signup flow
+ User enters username + password
+ Generate RSA/ECC keypair in browser
+ Set extractable: false
+ Save public key to GunDB under username
+ Store private key locally (IndexedDB only)
 
-so the way it works is each user in the chat session will generate a keypair like {public_key: xxxx, private_key: xxxx}
+2. Local key storage (critical)
+ Use IndexedDB (NOT localStorage)
+ Store:
+privateKey
+key metadata (algorithm, createdAt, userId)
+ Never export private key
+ Never send private key to server/DB
 
-no user can see the private key - just the public key. they share the public key between one another (how idk yet. will have to find a way)
+3. Login flow
+ User logs in with username + password
+ Check GunDB for username → public key exists
+ Load private key from IndexedDB
+ If private key exists → login success
+ If missing → treat as new device (no access)
 
-the public key gets sent with every message and essentially "protects" the messages from falling into the wrong hands or being copied by hackers
+4. Key verification (optional but good)
+ On login, run a test challenge:
+server sends random string
+client signs it with private key
+verify using public key
 
-then then the recepient receives the message with the public key then the data is decrypted by the private key that is stored on the user's device.
+(This confirms key is valid without exposing it)
 
-I also want to keep the "mutually agreed decryption-encryption keypair" between users for the duration of the chat but keep it strictly optional between them and have them know it adds no extra security. just a "veil" over their messages. if they keypair is wrong then they themselves will not see the messages unless they remove it and use another one.
+5. Messaging flow
+Sending
+ Fetch recipient public key from GunDB
+ Encrypt message using:
+RSA-OAEP (small messages) OR
+Hybrid (AES-GCM + RSA) if you want better performance
+ Send encrypted message + sender info
+Receiving
+ Load private key from IndexedDB
+ Decrypt message locally only
+ Never decrypt on server
 
-I dont know 100% if i am getting it right but thats what i understood so far from the research.
+6. GunDB structure (simple version)
+ users/{username}/publicKey
+ messages/{chatId} stores encrypted messages only
+ No private data stored in GunDB
 
-Good news is the browser can generate the keypair for me and store it. which is good. but i never implemented something like this before.
-eh ill figure it out i always do.
-  
----
+7. Security rules (non-negotiable)
+ Private key never leaves device
+ No key export feature
+ No server-side decryption ever
+ Assume DB is public / compromised
+ Treat GunDB as “message relay only”
+
+8. Session behavior
+ Password only controls app access/session
+ Logging out does NOT delete key
+ Reinstall = loss of access (expected)
+
+9. Failure handling
+
+ If private key missing → show:
+
+“This device has no registered identity. You must use original device.”
+
+(No recovery yet — intentional)
+
+🧭 Mental model to stick to
+Username = label
+Public key = identity
+Private key = identity proof (device-bound)
+GunDB = public routing layer only
