@@ -8,7 +8,10 @@ import { Modal } from "../Components/Modal";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGear } from "@fortawesome/free-solid-svg-icons";
 
-import { encryptWithPublicKey, decryptWithPrivateKey } from "../logic/encryption";
+import {
+  encryptWithPublicKey,
+  decryptWithPrivateKey,
+} from "../logic/encryption";
 import { getPrivateKey } from "../logic/privateKey";
 import { getPublicKey } from "../logic/publicKey";
 
@@ -25,11 +28,16 @@ const Chat = () => {
   const convId = conversationId(myUser, recipientUser);
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
-  const [recipientPublicKey, setRecipientPublicKey] = useState<CryptoKey | null>(null);
-  const [myUserPrivateKey, setMyUserPrivateKey] = useState<CryptoKey | null>(null);
+  const [recipientPublicKey, setRecipientPublicKey] =
+    useState<CryptoKey | null>(null);
+  const [myUserPrivateKey, setMyUserPrivateKey] = useState<CryptoKey | null>(
+    null,
+  );
   const [encryptionKey, setEncryptionKey] = useState("");
   const [decryptionKey, setDecryptionKey] = useState("");
-  const [decryptedMessages, setDecryptedMessages] = useState<Record<string, string>>({});
+  const [decryptedMessages, setDecryptedMessages] = useState<
+    Record<string, string>
+  >({});
 
   const [confirmation, setConfirmation] = useState<"delete" | "block" | null>(
     null,
@@ -40,10 +48,14 @@ const Chat = () => {
 
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
-
-
-  const getAndSetRecipientPublicKey = async () => await getPublicKey(recipientUser).then((pubKey) => setRecipientPublicKey(pubKey)).catch(() => setRecipientPublicKey(null));
-  const getAndSetUserPrivateKey = async () => await getPrivateKey(myUser).then((privKey) => setMyUserPrivateKey(privKey)).catch(() => setMyUserPrivateKey(null));
+  const getAndSetRecipientPublicKey = async () =>
+    await getPublicKey(recipientUser)
+      .then((pubKey) => setRecipientPublicKey(pubKey))
+      .catch(() => setRecipientPublicKey(null));
+  const getAndSetUserPrivateKey = async () =>
+    await getPrivateKey(myUser)
+      .then((privKey) => setMyUserPrivateKey(privKey))
+      .catch(() => setMyUserPrivateKey(null));
 
   useEffect(() => {
     getAndSetRecipientPublicKey();
@@ -74,12 +86,20 @@ const Chat = () => {
   }, [convId, myUser]);
 
   useEffect(() => {
+    if (!recipientPublicKey) {
+      alert(`You cannot chat with ${recipientUser} (no public key)`)
+      navigate("/home", {
+        replace: true,
+      });
+    }
+  }, [recipientUser]);
+
+  useEffect(() => {
     if (!myUserPrivateKey) {
       setDecryptedMessages({});
       return;
     }
 
-    // this is from the older methods and im not a huige fan of it...
     const decryptMessages = async () => {
       const entries = await Promise.all(
         messages.map(async (item) => {
@@ -158,7 +178,7 @@ const Chat = () => {
           const isMe = item.user_id === myUser;
           const displayMessage = isMe
             ? item.message
-            : decryptedMessages[item.id] ?? item.message;
+            : (decryptedMessages[item.id] ?? item.message);
 
           return (
             <div key={item.id} style={getMessageBubbleStyle(isMe)}>
@@ -241,7 +261,7 @@ const Chat = () => {
           visible={activeModal === "confirmation"}
           onClose={() => setActiveModal(null)}
         >
-          Confirmation To {" "}
+          Confirmation To{" "}
           {confirmation === "delete"
             ? `Delete Chat with ${recipientUser}`
             : `Block ${recipientUser}`}
