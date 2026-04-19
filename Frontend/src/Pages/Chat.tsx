@@ -25,11 +25,12 @@ const Chat = () => {
     recipientUser: "",
   };
 
-  const convId = conversationId(myUser, recipientUser);
+  const hasValidChatParticipants = Boolean(myUser && recipientUser);
+  const convId = hasValidChatParticipants ? conversationId(myUser, recipientUser) : "";
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
-  const [recipientPublicKey, setRecipientPublicKey] =
-    useState<CryptoKey | null>(null);
+  const [recipientPublicKey, setRecipientPublicKey] = useState<CryptoKey | null | undefined>(undefined);
+  const [recipientPublicKeyLoaded, setRecipientPublicKeyLoaded] = useState(false);
   const [myUserPrivateKey, setMyUserPrivateKey] = useState<CryptoKey | null>(
     null,
   );
@@ -48,20 +49,38 @@ const Chat = () => {
 
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
-  const getAndSetRecipientPublicKey = async () =>
-    await getPublicKey(recipientUser)
-      .then((pubKey) => setRecipientPublicKey(pubKey))
-      .catch(() => setRecipientPublicKey(null));
+  const getAndSetRecipientPublicKey = async () => {
+    if (!recipientUser) return;
+    try {
+      const pubKey = await getPublicKey(recipientUser);
+      setRecipientPublicKey(pubKey);
+    } finally {
+      setRecipientPublicKeyLoaded(true);
+    }
+  };
+
   const getAndSetUserPrivateKey = async () =>
     await getPrivateKey(myUser)
       .then((privKey) => setMyUserPrivateKey(privKey))
       .catch(() => setMyUserPrivateKey(null));
 
   useEffect(() => {
+    if (!recipientUser) return;
+    setRecipientPublicKeyLoaded(false);
     getAndSetRecipientPublicKey();
   }, [recipientUser]);
 
   useEffect(() => {
+    if (!recipientUser || !recipientPublicKeyLoaded) return;
+    if (recipientPublicKey === null) {
+      alert(`You cannot chat with ${recipientUser} (no public key)`);
+      navigate("/home", { replace: true });
+    }
+  }, [recipientPublicKeyLoaded, recipientPublicKey, recipientUser, navigate]);
+
+  useEffect(() => {
+    if (!hasValidChatParticipants) return;
+
     const cleanup = subscribeMessages(convId, (msg: any, key: string) => {
       if (!msg || !msg.message) return;
       if (seen.current.has(key)) return;
@@ -83,16 +102,7 @@ const Chat = () => {
 
     getAndSetUserPrivateKey();
     return cleanup;
-  }, [convId, myUser]);
-
-  useEffect(() => {
-    if (!recipientPublicKey) {
-      alert(`You cannot chat with ${recipientUser} (no public key)`)
-      navigate("/home", {
-        replace: true,
-      });
-    }
-  }, [recipientUser]);
+  }, [convId, myUser, recipientUser, hasValidChatParticipants]);
 
   useEffect(() => {
     if (!myUserPrivateKey) {
@@ -148,6 +158,19 @@ const Chat = () => {
       recipient: recipientUser,
       message: payloadMessage,
     });
+  }
+
+  if (!hasValidChatParticipants) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.emptyState}>
+          <span style={styles.emptyStateTitle}>Invalid chat session</span>
+          <span style={styles.emptyStateText}>
+            Returning to home because chat information is missing.
+          </span>
+        </div>
+      </div>
+    );
   }
 
   return (

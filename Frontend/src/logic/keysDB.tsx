@@ -1,3 +1,6 @@
+import { getPrivateKey } from "./privateKey";
+import { getPublicKey } from "./publicKey";
+
 export {
   dbName,
   storeName,
@@ -69,8 +72,6 @@ const generateKeyPair = async (): Promise<CryptoKeyPair> =>
     ["encrypt", "decrypt"],
   );
 
-import { getPrivateKey } from "./privateKey";
-import { getPublicKey } from "./publicKey";
 
 const doUserKeysExist = async (username: string) => {
   const priv = await getPrivateKey(username)
