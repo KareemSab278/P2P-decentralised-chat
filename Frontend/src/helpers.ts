@@ -5,6 +5,7 @@ export interface SendMessagePayload {
   user_tag: string;
   recipient: string;
   message: string;
+  senderMessage?: string;
 }
 
 const conversationId = (a: string, b: string) => {

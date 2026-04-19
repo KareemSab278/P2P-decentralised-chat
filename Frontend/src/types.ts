@@ -13,5 +13,6 @@ export interface Message {
   user_tag: string;
   recipient: string;
   message: string;
+  senderMessage?: string;
   timestamp: number;
 }

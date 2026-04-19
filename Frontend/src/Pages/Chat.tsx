@@ -31,6 +31,7 @@ const Chat = () => {
   const [text, setText] = useState("");
   const [recipientPublicKey, setRecipientPublicKey] = useState<CryptoKey | null | undefined>(undefined);
   const [recipientPublicKeyLoaded, setRecipientPublicKeyLoaded] = useState(false);
+  const [myUserPublicKey, setMyUserPublicKey] = useState<CryptoKey | null>(null);
   const [myUserPrivateKey, setMyUserPrivateKey] = useState<CryptoKey | null>(
     null,
   );
@@ -59,10 +60,14 @@ const Chat = () => {
     }
   };
 
-  const getAndSetUserPrivateKey = async () =>
+  const getAndSetUserKeys = async () => {
     await getPrivateKey(myUser)
       .then((privKey) => setMyUserPrivateKey(privKey))
       .catch(() => setMyUserPrivateKey(null));
+    await getPublicKey(myUser)
+      .then((pubKey) => setMyUserPublicKey(pubKey))
+      .catch(() => setMyUserPublicKey(null));
+  };
 
   useEffect(() => {
     if (!recipientUser) return;
@@ -92,6 +97,7 @@ const Chat = () => {
         user_tag: msg.user_tag,
         recipient: msg.recipient,
         message: msg.message,
+        senderMessage: msg.senderMessage,
         timestamp: msg.timestamp,
       };
 
@@ -100,7 +106,7 @@ const Chat = () => {
       );
     });
 
-    getAndSetUserPrivateKey();
+    getAndSetUserKeys();
     return cleanup;
   }, [convId, myUser, recipientUser, hasValidChatParticipants]);
 
@@ -113,14 +119,13 @@ const Chat = () => {
     const decryptMessages = async () => {
       const entries = await Promise.all(
         messages.map(async (item) => {
-          if (item.user_id === myUser) {
-            return [item.id, item.message] as const;
-          }
+          const ciphertext =
+            item.user_id === myUser ? item.senderMessage ?? null : item.message;
 
           try {
             const decrypted = await decryptWithPrivateKey(
               myUserPrivateKey,
-              item.message,
+              ciphertext,
             );
             return [item.id, decrypted] as const;
           } catch {
@@ -147,9 +152,14 @@ const Chat = () => {
     setText("");
 
     let payloadMessage = trimmed;
+    let senderMessage: string | undefined;
 
     if (recipientPublicKey) {
       payloadMessage = await encryptWithPublicKey(recipientPublicKey, trimmed);
+    }
+
+    if (myUserPublicKey) {
+      senderMessage = await encryptWithPublicKey(myUserPublicKey, trimmed);
     }
 
     sendMessage(convId, {
@@ -157,6 +167,7 @@ const Chat = () => {
       user_tag: `@${myUser}`,
       recipient: recipientUser,
       message: payloadMessage,
+      senderMessage,
     });
   }
 
@@ -199,9 +210,7 @@ const Chat = () => {
       <div ref={listRef} style={styles.messageList}>
         {messages.map((item) => {
           const isMe = item.user_id === myUser;
-          const displayMessage = isMe
-            ? item.message
-            : (decryptedMessages[item.id] ?? item.message);
+          const displayMessage = decryptedMessages[item.id] ?? item.message;
 
           return (
             <div key={item.id} style={getMessageBubbleStyle(isMe)}>
