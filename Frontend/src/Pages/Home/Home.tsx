@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import type { CSSProperties } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Modal } from "../Components/Modal";
-import { Search } from "../Components/Search";
-import type { HomeState } from "../types";
-import { getChatsForUser } from "../helpers";
+import { Modal } from "../../Components/Modal";
+import { Search } from "../../Components/Search";
+import type { HomeState } from "../../types";
+import { getChatsForUser } from "../../helpers";
 
 interface Conversation {
   username: string;

@@ -1,13 +1,13 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { gun } from "../gun";
-import { TextField } from "../Components/TextField";
-import Button from "../Components/Button";
+import { gun } from "../../gun";
+import { TextField } from "../../Components/TextField";
+import Button from "../../Components/Button";
 
-import { getPrivateKey } from "../logic/privateKey";
-import { getPublicKey } from "../logic/publicKey";
-import * as keys from "../logic/keysDB";
+import { getPrivateKey } from "../../logic/privateKey";
+import { getPublicKey } from "../../logic/publicKey";
+import * as keys from "../../logic/keysDB";
 
 export { SignIn };
 
